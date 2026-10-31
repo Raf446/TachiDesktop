@@ -1,0 +1,15 @@
+cargo:rerun-if-env-changed=TAURI_CONFIG
+cargo:rustc-check-cfg=cfg(desktop)
+cargo:rustc-cfg=desktop
+cargo:rustc-check-cfg=cfg(mobile)
+cargo:rerun-if-changed=C:\TachiDesktop\src-tauri\tauri.conf.json
+cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_APP_NAME=client
+cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_PREFIX=app_tachidesktop
+cargo:rustc-check-cfg=cfg(dev)
+cargo:rustc-cfg=dev
+cargo:PERMISSION_FILES_PATH=C:\TachiDesktop\src-tauri\target\debug\build\tachidesktop-1409344901e90760\out\app-manifest\__app__-permission-files
+cargo:rerun-if-changed=C:\TachiDesktop\src-tauri\capabilities
+cargo:rerun-if-env-changed=REMOVE_UNUSED_COMMANDS
+cargo:rustc-env=TAURI_ENV_TARGET_TRIPLE=x86_64-pc-windows-gnu
+package.metadata does not exist
+cargo:rustc-link-arg-bins=C:\TachiDesktop\src-tauri\target\debug\build\tachidesktop-1409344901e90760\out\libresource.a

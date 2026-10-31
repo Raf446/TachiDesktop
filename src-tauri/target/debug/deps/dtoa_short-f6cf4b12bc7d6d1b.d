@@ -1,0 +1,7 @@
+C:\TachiDesktop\src-tauri\target\debug\deps\dtoa_short-f6cf4b12bc7d6d1b.d: C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\dtoa-short-0.3.5\src\lib.rs
+
+C:\TachiDesktop\src-tauri\target\debug\deps\libdtoa_short-f6cf4b12bc7d6d1b.rlib: C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\dtoa-short-0.3.5\src\lib.rs
+
+C:\TachiDesktop\src-tauri\target\debug\deps\libdtoa_short-f6cf4b12bc7d6d1b.rmeta: C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\dtoa-short-0.3.5\src\lib.rs
+
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\dtoa-short-0.3.5\src\lib.rs:

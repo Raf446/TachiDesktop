@@ -1,0 +1,9 @@
+C:\TachiDesktop\src-tauri\target\debug\deps\hyper_rustls-80ea6f0d4a3d27b5.d: C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\lib.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\config.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector\builder.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\stream.rs
+
+C:\TachiDesktop\src-tauri\target\debug\deps\libhyper_rustls-80ea6f0d4a3d27b5.rmeta: C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\lib.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\config.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector\builder.rs C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\stream.rs
+
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\lib.rs:
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\config.rs:
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector.rs:
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\connector\builder.rs:
+C:\Users\Aspire\ Lite\ 15\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hyper-rustls-0.27.10\src\stream.rs:

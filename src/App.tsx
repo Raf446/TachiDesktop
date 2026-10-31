@@ -7,8 +7,10 @@ import {
   EpisodeItem,
   NavigationTab,
   StoredExtensionRecord,
+  StreamSource,
   TrackerAccountConfig,
   TrackerStatus,
+  TrackerSyncEvent,
 } from './types/anime';
 import {
   FALLBACK_ANIME_DETAILS,
@@ -24,88 +26,30 @@ import {
   updateDiscordActivity,
 } from './services/discordRpc';
 import {
+  fetchScrobbleHistory,
   fetchTrackerConfig,
+  saveTrackerConfig,
   scrobbleEpisodeProgress,
 } from './services/trackerSync';
+import { buildDefaultCompiledExtensions } from './services/repoCompiler';
+import {
+  initializeGlobalPluginBridge,
+  loadInstalledPlugins,
+  overridePluginBaseUrl,
+  removeInstalledPlugin,
+  resolveStreamsFromPlugin,
+  saveAndMountPlugin,
+} from './services/pluginRuntime';
 import { Titlebar } from './components/layout/Titlebar';
 import { Sidebar } from './components/layout/Sidebar';
 import { CommandPalette } from './components/layout/CommandPalette';
 import { CatalogView } from './components/catalog/CatalogView';
 import { AnimeDetailView } from './components/catalog/AnimeDetailView';
 import { TheaterPlayer } from './components/player/TheaterPlayer';
-
-const INITIAL_EXTENSIONS: StoredExtensionRecord[] = [
-  {
-    id: 'otakudesu',
-    name: 'Otakudesu',
-    version: '1.4.2',
-    lang: 'id',
-    baseUrl: 'https://otakudesu.cloud',
-    defaultBaseUrl: 'https://otakudesu.cloud',
-    sourceRepoUrl: 'https://github.com/tachiyomiorg/aniyomi-extensions/tree/master/src/id/otakudesu',
-    generatedJsCode: '// Compiled TachiDesktop .JS Plugin: Otakudesu (ID)',
-    pingMs: 42,
-    hasUpdate: false,
-    isBuiltin: true,
-    updatedAt: '2026-10-31',
-  },
-  {
-    id: 'samehadaku',
-    name: 'Samehadaku',
-    version: '1.3.8',
-    lang: 'id',
-    baseUrl: 'https://samehadaku.email',
-    defaultBaseUrl: 'https://samehadaku.email',
-    sourceRepoUrl: 'https://github.com/tachiyomiorg/aniyomi-extensions/tree/master/src/id/samehadaku',
-    generatedJsCode: '// Compiled TachiDesktop .JS Plugin: Samehadaku (ID)',
-    pingMs: 58,
-    hasUpdate: true,
-    isBuiltin: true,
-    updatedAt: '2026-10-30',
-  },
-  {
-    id: 'kuramanime',
-    name: 'Kuramanime',
-    version: '2.1.0',
-    lang: 'id',
-    baseUrl: 'https://kuramanime.red',
-    defaultBaseUrl: 'https://kuramanime.red',
-    sourceRepoUrl: 'https://github.com/tachiyomiorg/aniyomi-extensions/tree/master/src/id/kuramanime',
-    generatedJsCode: '// Compiled TachiDesktop .JS Plugin: Kuramanime (ID)',
-    pingMs: 64,
-    hasUpdate: false,
-    isBuiltin: true,
-    updatedAt: '2026-10-29',
-  },
-  {
-    id: 'hianime',
-    name: 'HiAnime',
-    version: '3.0.4',
-    lang: 'en',
-    baseUrl: 'https://hianime.to',
-    defaultBaseUrl: 'https://hianime.to',
-    sourceRepoUrl: 'https://github.com/tachiyomiorg/aniyomi-extensions/tree/master/src/en/hianime',
-    generatedJsCode: '// Compiled TachiDesktop .JS Plugin: HiAnime (EN)',
-    pingMs: 85,
-    hasUpdate: true,
-    isBuiltin: true,
-    updatedAt: '2026-10-28',
-  },
-  {
-    id: 'anoboy',
-    name: 'Anoboy',
-    version: '1.1.9',
-    lang: 'id',
-    baseUrl: 'https://anoboy.baby',
-    defaultBaseUrl: 'https://anoboy.baby',
-    sourceRepoUrl: 'https://github.com/tachiyomiorg/aniyomi-extensions/tree/master/src/id/anoboy',
-    generatedJsCode: '// Compiled TachiDesktop .JS Plugin: Anoboy (ID)',
-    pingMs: 71,
-    hasUpdate: false,
-    isBuiltin: true,
-    updatedAt: '2026-10-25',
-  },
-];
+import { ExtensionManager } from './components/extensions/ExtensionManager';
+import { JsCodeInspectorModal } from './components/extensions/JsCodeInspectorModal';
+import { DomainOverrideModal } from './components/extensions/DomainOverrideModal';
+import { SettingsView } from './components/settings/SettingsView';
 
 type ActiveScreen = 'catalog' | 'detail' | 'player';
 
@@ -122,9 +66,18 @@ export const App: React.FC = () => {
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(
     INITIAL_CONTINUE_WATCHING
   );
-  const [extensions, setExtensions] =
-    useState<StoredExtensionRecord[]>(INITIAL_EXTENSIONS);
+  const [extensions, setExtensions] = useState<StoredExtensionRecord[]>(
+    buildDefaultCompiledExtensions
+  );
   const [selectedExtensionId, setSelectedExtensionId] = useState<string>('otakudesu');
+  const [resolvedStreams, setResolvedStreams] = useState<StreamSource[] | undefined>(
+    undefined
+  );
+
+  const [inspectModalPlugin, setInspectModalPlugin] =
+    useState<StoredExtensionRecord | null>(null);
+  const [domainModalPlugin, setDomainModalPlugin] =
+    useState<StoredExtensionRecord | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
@@ -145,10 +98,34 @@ export const App: React.FC = () => {
     autoScrobbleThreshold: 80,
   });
 
-  // Load initial Discord RPC & Tracker config
+  const [scrobbleHistory, setScrobbleHistory] = useState<TrackerSyncEvent[]>([
+    {
+      animeId: 'aot-final',
+      malId: 40028,
+      animeTitle: 'Attack on Titan: The Final Season',
+      episodeNumber: 13,
+      totalEpisodes: 28,
+      status: 'Watching',
+      syncedAt: 'Yesterday',
+      provider: 'MyAnimeList',
+    },
+  ]);
+
+  // Initialize bridge, plugins, Discord RPC status & tracker state
   useEffect(() => {
+    initializeGlobalPluginBridge();
+    loadInstalledPlugins().then((list) => {
+      if (list.length > 0) {
+        setExtensions(list);
+      }
+    });
     getDiscordRpcStatus().then(setDiscordStatus);
     fetchTrackerConfig().then(setTrackerConfig);
+    fetchScrobbleHistory().then((hist) => {
+      if (hist.length > 0) {
+        setScrobbleHistory(hist);
+      }
+    });
   }, []);
 
   // Global keyboard shortcut for Command Palette (Ctrl+K / Cmd+K)
@@ -188,6 +165,20 @@ export const App: React.FC = () => {
       extensions[0]
     );
   }, [extensions, selectedExtensionId]);
+
+  // Resolve streams from active .JS plugin when entering player
+  useEffect(() => {
+    if (activeScreen !== 'player' || !activeExtension || !currentEpisode) return;
+    let cancelled = false;
+    resolveStreamsFromPlugin(activeExtension, currentEpisode.url).then((streams) => {
+      if (!cancelled) {
+        setResolvedStreams(streams.length > 0 ? streams : undefined);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeScreen, activeExtension, currentEpisode]);
 
   // Sync Discord Rich Presence whenever screen or active episode changes
   useEffect(() => {
@@ -242,23 +233,17 @@ export const App: React.FC = () => {
     [animeDetailsMap]
   );
 
-  const handlePlayEpisode = useCallback(
-    (episode: EpisodeItem) => {
-      setActiveEpisodeId(episode.id);
-      setActiveScreen('player');
-    },
-    []
-  );
+  const handlePlayEpisode = useCallback((episode: EpisodeItem) => {
+    setActiveEpisodeId(episode.id);
+    setActiveScreen('player');
+  }, []);
 
-  const handleResumeWatchingItem = useCallback(
-    (item: ContinueWatchingItem) => {
-      setSelectedAnimeId(item.animeId);
-      setSelectedExtensionId(item.extensionId);
-      setActiveEpisodeId(item.episodeId);
-      setActiveScreen('player');
-    },
-    []
-  );
+  const handleResumeWatchingItem = useCallback((item: ContinueWatchingItem) => {
+    setSelectedAnimeId(item.animeId);
+    setSelectedExtensionId(item.extensionId);
+    setActiveEpisodeId(item.episodeId);
+    setActiveScreen('player');
+  }, []);
 
   const handleToggleLibrary = useCallback((animeId: string) => {
     setAnimeDetailsMap((prev) => {
@@ -336,6 +321,8 @@ export const App: React.FC = () => {
 
   const handleAutoScrobbleTriggered = useCallback(
     async (episode: EpisodeItem) => {
+      if (!trackerConfig.autoScrobbleEnabled) return;
+
       setAnimeDetailsMap((prev) => {
         const current = prev[selectedAnimeId];
         if (!current) return prev;
@@ -353,22 +340,78 @@ export const App: React.FC = () => {
         };
       });
 
-      await scrobbleEpisodeProgress({
+      const event = await scrobbleEpisodeProgress({
         animeId: currentAnimeDetail.id,
         malId: currentAnimeDetail.malId,
         animeTitle: currentAnimeDetail.title,
         episodeNumber: episode.number,
         totalEpisodes: currentAnimeDetail.totalEpisodes,
       });
+
+      setScrobbleHistory((prev) => [
+        event,
+        ...prev.filter(
+          (i) =>
+            !(
+              i.animeId === event.animeId &&
+              i.episodeNumber === event.episodeNumber
+            )
+        ),
+      ]);
     },
-    [selectedAnimeId, currentAnimeDetail]
+    [selectedAnimeId, currentAnimeDetail, trackerConfig.autoScrobbleEnabled]
   );
 
-  const handleToggleDiscordQuick = useCallback(async () => {
-    const next = !discordStatus.enabled;
-    const status = await setDiscordRpcEnabled(next);
+  const handleSetDiscordEnabled = useCallback(async (enabled: boolean) => {
+    const status = await setDiscordRpcEnabled(enabled);
     setDiscordStatus(status);
-  }, [discordStatus.enabled]);
+  }, []);
+
+  const handleInstallOrUpdatePlugin = useCallback(
+    async (plugin: StoredExtensionRecord) => {
+      const saved = await saveAndMountPlugin(plugin);
+      setExtensions((prev) => {
+        const exists = prev.some((item) => item.id === saved.id);
+        if (exists) {
+          return prev.map((item) => (item.id === saved.id ? saved : item));
+        }
+        return [saved, ...prev];
+      });
+      setSelectedExtensionId(saved.id);
+    },
+    []
+  );
+
+  const handleApplyDomainOverride = useCallback(
+    async (id: string, newBaseUrl: string, newPingMs?: number) => {
+      const nextList = await overridePluginBaseUrl(id, newBaseUrl, extensions);
+      setExtensions(
+        nextList.map((item) =>
+          item.id === id && newPingMs !== undefined
+            ? { ...item, pingMs: newPingMs }
+            : item
+        )
+      );
+    },
+    [extensions]
+  );
+
+  const handleDeletePlugin = useCallback(
+    async (id: string) => {
+      const nextList = await removeInstalledPlugin(id, extensions);
+      setExtensions(nextList);
+      if (selectedExtensionId === id && nextList[0]) {
+        setSelectedExtensionId(nextList[0].id);
+      }
+    },
+    [extensions, selectedExtensionId]
+  );
+
+  const handleUpdatePluginPing = useCallback((id: string, pingMs: number) => {
+    setExtensions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, pingMs } : item))
+    );
+  }, []);
 
   const libraryCount = useMemo(
     () => catalog.filter((item) => item.inLibrary).length,
@@ -388,13 +431,14 @@ export const App: React.FC = () => {
           searchQuery={searchQuery}
           onSearchChange={(q) => {
             setSearchQuery(q);
-            if (activeScreen !== 'catalog') {
+            if (activeScreen !== 'catalog' || activeTab === 'extensions' || activeTab === 'settings') {
+              setActiveTab('browse');
               setActiveScreen('catalog');
             }
           }}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           discordStatus={discordStatus}
-          onToggleDiscordQuick={handleToggleDiscordQuick}
+          onToggleDiscordQuick={() => handleSetDiscordEnabled(!discordStatus.enabled)}
           trackerConfig={trackerConfig}
           onNavigateSettings={() => {
             setActiveTab('settings');
@@ -429,6 +473,7 @@ export const App: React.FC = () => {
               anime={currentAnimeDetail}
               episode={currentEpisode}
               activeExtension={activeExtension}
+              customStreams={resolvedStreams}
               autoScrobbleThreshold={trackerConfig.autoScrobbleThreshold}
               onBackToDetail={(lastSec) => {
                 handlePlayerProgressUpdate(
@@ -454,13 +499,37 @@ export const App: React.FC = () => {
               onPlayEpisode={handlePlayEpisode}
               onToggleLibrary={handleToggleLibrary}
               onUpdateTrackerStatus={handleUpdateTrackerStatus}
-              onOpenDomainOverride={() => {
-                setActiveTab('extensions');
-                setActiveScreen('catalog');
+              onOpenDomainOverride={(ext) => setDomainModalPlugin(ext)}
+              onOpenInspectJs={(ext) => setInspectModalPlugin(ext)}
+            />
+          ) : activeTab === 'extensions' ? (
+            <ExtensionManager
+              extensions={extensions}
+              activeExtensionId={selectedExtensionId}
+              onSelectActiveExtension={(id) => setSelectedExtensionId(id)}
+              onInstallCompiledPlugin={handleInstallOrUpdatePlugin}
+              onOpenInspectModal={(ext) => setInspectModalPlugin(ext)}
+              onOpenDomainModal={(ext) => setDomainModalPlugin(ext)}
+              onDeletePlugin={handleDeletePlugin}
+              onUpdatePing={handleUpdatePluginPing}
+            />
+          ) : activeTab === 'settings' ? (
+            <SettingsView
+              discordStatus={discordStatus}
+              onToggleDiscordRpc={handleSetDiscordEnabled}
+              trackerConfig={trackerConfig}
+              onSaveTrackerConfig={async (nextCfg) => {
+                const saved = await saveTrackerConfig(nextCfg);
+                setTrackerConfig(saved);
               }}
-              onOpenInspectJs={() => {
-                setActiveTab('extensions');
-                setActiveScreen('catalog');
+              scrobbleHistory={scrobbleHistory}
+              onTriggerTestScrobble={async () => {
+                const ep14 =
+                  currentAnimeDetail.episodes.find((e) => e.number === 14) ||
+                  currentAnimeDetail.episodes[0];
+                if (ep14) {
+                  await handleAutoScrobbleTriggered(ep14);
+                }
               }}
             />
           ) : (
@@ -495,6 +564,23 @@ export const App: React.FC = () => {
           setActiveEpisodeId('aot-s4-ep-14');
           setActiveScreen('player');
         }}
+      />
+
+      {/* Inspect / Edit .JS Code Modal */}
+      <JsCodeInspectorModal
+        extension={inspectModalPlugin}
+        onClose={() => setInspectModalPlugin(null)}
+        onSaveAndHotReload={async (updated) => {
+          await handleInstallOrUpdatePlugin(updated);
+          setInspectModalPlugin(updated);
+        }}
+      />
+
+      {/* Domain Override (ISP Bypass) Modal */}
+      <DomainOverrideModal
+        extension={domainModalPlugin}
+        onClose={() => setDomainModalPlugin(null)}
+        onApplyOverride={handleApplyDomainOverride}
       />
     </div>
   );
